@@ -26,11 +26,30 @@ const IconMoon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="no
 const IconSun = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>);
 const IconLogout = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>);
 const GoogleG = () => (<svg className="g-ico" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>);
+const IconHistory = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>);
 
 /* --------------------------- Formatting --------------------------- */
 const fmtPlain = new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 });
 const fmt = (n) => "$" + fmtPlain.format(Math.round(Math.abs(n)));
 const today = () => new Date().toLocaleDateString("es-CL", { day: "2-digit", month: "long", year: "numeric" });
+
+const fmtDate = (ts) => ts ? new Date(ts).toLocaleDateString("es-CL", { day: "2-digit", month: "short" }) : "";
+const fmtTime = (ts) => ts ? new Date(ts).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" }) : "";
+const fmtDateTime = (ts) => ts ? `${fmtDate(ts)}, ${fmtTime(ts)}` : "";
+// Tiempo relativo legible para el historial ("hace 5 min", "ayer", …).
+function relTime(ts) {
+  const s = Math.floor((Date.now() - ts) / 1000);
+  if (s < 45) return "recién";
+  const m = Math.floor(s / 60);
+  if (m < 1) return "hace segundos";
+  if (m < 60) return `hace ${m} min`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return `hace ${h} h`;
+  const d = Math.floor(h / 24);
+  if (d === 1) return "ayer";
+  if (d < 7) return `hace ${d} días`;
+  return fmtDate(ts);
+}
 
 /* ----------------------------- Firebase --------------------------- */
 // Inicializa Firebase solo si firebase-config.js trae credenciales reales.
@@ -66,12 +85,13 @@ async function signInWithGoogle() {
 }
 
 /* ----------------------------- Seed data -------------------------- */
+const DAY = 86400000;
 const SEED = [
-  { id: 1, desc: "Cadena GF 18K",   amount:   3900, settled: false },
-  { id: 2, desc: "Ventas web",      amount: -200000, settled: false },
-  { id: 3, desc: "Insumos",         amount:  45000, settled: false },
-  { id: 4, desc: "Anticipo socio",  amount: -80000, settled: false },
-  { id: 5, desc: "Dijes plata 925", amount:  12500, settled: false },
+  { id: 1, desc: "Cadena GF 18K",   amount:   3900, settled: false, createdAt: Date.now() - 5 * DAY },
+  { id: 2, desc: "Ventas web",      amount: -200000, settled: false, createdAt: Date.now() - 4 * DAY },
+  { id: 3, desc: "Insumos",         amount:  45000, settled: false, createdAt: Date.now() - 3 * DAY },
+  { id: 4, desc: "Anticipo socio",  amount: -80000, settled: false, createdAt: Date.now() - 2 * DAY },
+  { id: 5, desc: "Dijes plata 925", amount:  12500, settled: false, createdAt: Date.now() - 1 * DAY },
 ];
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
@@ -92,7 +112,9 @@ function App() {
   // En modo local arrancamos con datos de ejemplo; con Firebase, vacío hasta
   // cargar el libro del usuario desde Firestore.
   const [items, setItems] = useState(fb ? [] : SEED);
-  const [loaded, setLoaded] = useState(false); // datos de la nube ya cargados
+  const [history, setHistory] = useState([]);   // registro de actividad
+  const [loaded, setLoaded] = useState(false);  // datos de la nube ya cargados
+  const [showHistory, setShowHistory] = useState(false);
   const [desc, setDesc] = useState("");
   const [amount, setAmount] = useState("");
   const [side, setSide] = useState("diego");
@@ -107,34 +129,49 @@ function App() {
 
   const nextId = useRef(fb ? 1 : SEED.length + 1);
   const descRef = useRef(null);
+  const skipSaveRef = useRef(false);   // evita re-guardar cambios recibidos del servidor
+  const lastLocalEditRef = useRef(0);  // marca de tiempo de la última edición local
 
-  /* ---- Persistencia en Firestore (un libro por usuario) ---- */
-  // Cargar al iniciar sesión.
+  /* ---- Sincronización en vivo con Firestore (un libro por usuario) ---- */
+  // onSnapshot mantiene la app al día en tiempo real: cualquier cambio (en
+  // otra pestaña, otro dispositivo o desde la consola) se refleja sin recargar.
+  // skipSaveRef evita que un cambio recibido del servidor se vuelva a escribir
+  // (eco) y genere un bucle infinito.
   useEffect(() => {
     if (!fb || !user) { setLoaded(false); return; }
-    let active = true;
-    fb.db.collection("ledgers").doc(user.uid).get().then((snap) => {
-      if (!active) return;
-      const data = snap.exists ? snap.data() : null;
-      const its = data && Array.isArray(data.items) ? data.items : [];
-      setItems(its);
-      if (data && data.names) setNames(data.names);
-      nextId.current = its.reduce((m, i) => Math.max(m, i.id), 0) + 1;
+    const ref = fb.db.collection("ledgers").doc(user.uid);
+    const unsub = ref.onSnapshot((snap) => {
+      // El eco optimista de nuestras propias escrituras llega con
+      // hasPendingWrites=true; lo ignoramos (el estado local ya lo refleja).
+      if (snap.metadata.hasPendingWrites) return;
+      if (!snap.exists) { setLoaded(true); return; }
+      const data = snap.data();
+      // Ignora la confirmación de un guardado anterior si ya hicimos un cambio
+      // local más nuevo (evita que un eco tardío pise datos recién editados).
+      if (data.updatedAt && data.updatedAt < lastLocalEditRef.current) { setLoaded(true); return; }
+      skipSaveRef.current = true; // viene del servidor → no reenviar
+      setItems(Array.isArray(data.items) ? data.items : []);
+      setHistory(Array.isArray(data.history) ? data.history : []);
+      if (data.names) setNames(data.names);
+      const maxId = (data.items || []).reduce((m, i) => Math.max(m, i.id || 0), 0);
+      nextId.current = Math.max(nextId.current, maxId + 1);
       setLoaded(true);
-    }).catch((e) => { console.error("[Firestore] Error al cargar:", e); setLoaded(true); });
-    return () => { active = false; };
+    }, (err) => { console.error("[Firestore] onSnapshot:", err); setLoaded(true); });
+    return unsub;
   }, [user]);
 
   // Guardar (con debounce) ante cualquier cambio, una vez cargado.
   useEffect(() => {
     if (!fb || !user || !loaded) return;
+    if (skipSaveRef.current) { skipSaveRef.current = false; return; } // cambio remoto: no reescribir
+    const stamp = lastLocalEditRef.current = Date.now();
     const h = setTimeout(() => {
       fb.db.collection("ledgers").doc(user.uid).set(
-        { items, names, updatedAt: Date.now() }, { merge: true }
+        { items, history, names, updatedAt: stamp }, { merge: true }
       ).catch((e) => console.error("[Firestore] Error al guardar:", e));
     }, 600);
     return () => clearTimeout(h);
-  }, [items, names, user, loaded]);
+  }, [items, history, names, user, loaded]);
 
   /* derived */
   const diegoItems = items.filter((i) => i.amount > 0);
@@ -149,30 +186,60 @@ function App() {
   const parseAmt = (v) => { const n = parseInt(String(v).replace(/[^\d]/g, ""), 10); return isNaN(n) ? 0 : n; };
   const canAdd = desc.trim().length > 0 && parseAmt(amount) > 0;
 
+  const sideName = (s) => (s === "diego" ? names.diego : names.socio);
+  // Agrega un evento al historial (más reciente primero; se conservan 200).
+  function logEvent(type, text) {
+    const entry = {
+      id: (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : String(Date.now()) + Math.random().toString(36).slice(2),
+      ts: Date.now(), type, text,
+      by: user ? (user.displayName || user.email || null) : null,
+    };
+    setHistory((h) => [entry, ...h].slice(0, 200));
+  }
+
   function addItem() {
     if (!canAdd) return;
     const mag = parseAmt(amount);
     const id = nextId.current++;
-    setItems((prev) => [...prev, { id, desc: desc.trim(), amount: side === "diego" ? mag : -mag, settled: false }]);
+    const d = desc.trim();
+    setItems((prev) => [...prev, { id, desc: d, amount: side === "diego" ? mag : -mag, settled: false, createdAt: Date.now() }]);
+    logEvent("add", `Agregó "${d}" · ${fmt(mag)} a favor de ${sideName(side)}`);
     setNewId(id);
     setDesc(""); setAmount("");
     descRef.current && descRef.current.focus();
     setTimeout(() => setNewId(null), 400);
   }
-  const removeItem = (id) => setItems((p) => p.filter((i) => i.id !== id));
-  const toggleSettled = (id) => setItems((p) => p.map((i) => i.id === id ? { ...i, settled: !i.settled } : i));
+  function removeItem(id) {
+    const it = items.find((i) => i.id === id);
+    setItems((p) => p.filter((i) => i.id !== id));
+    if (it) logEvent("delete", `Eliminó "${it.desc}" · ${fmt(it.amount)} a favor de ${it.amount > 0 ? names.diego : names.socio}`);
+  }
+  function toggleSettled(id) {
+    const it = items.find((i) => i.id === id);
+    const willSettle = it && !it.settled;
+    setItems((p) => p.map((i) => i.id === id
+      ? { ...i, settled: !i.settled, settledAt: !i.settled ? Date.now() : null } : i));
+    if (it) logEvent(willSettle ? "settle" : "reopen", `${willSettle ? "Saldó" : "Reabrió"} "${it.desc}" · ${fmt(it.amount)}`);
+  }
 
   function startEdit(it) { setEditId(it.id); setEditDesc(it.desc); setEditAmt(String(Math.abs(it.amount))); }
   function saveEdit(it) {
     const mag = parseAmt(editAmt);
     if (!editDesc.trim() || mag <= 0) { setEditId(null); return; }
     const sign = it.amount < 0 ? -1 : 1;
-    setItems((p) => p.map((i) => i.id === it.id ? { ...i, desc: editDesc.trim(), amount: mag * sign } : i));
+    const newDesc = editDesc.trim();
+    setItems((p) => p.map((i) => i.id === it.id ? { ...i, desc: newDesc, amount: mag * sign } : i));
+    if (newDesc !== it.desc || mag !== Math.abs(it.amount)) {
+      logEvent("edit", `Editó "${it.desc}"${newDesc !== it.desc ? ` → "${newDesc}"` : ""} · ahora ${fmt(mag)}`);
+    }
     setEditId(null);
   }
   function commitName(key, val) {
     const v = val.trim();
-    setNames((n) => ({ ...n, [key]: v || (key === "diego" ? "Diego" : "Socio") }));
+    const final = v || (key === "diego" ? "Diego" : "Socio");
+    const prev = names[key];
+    setNames((n) => ({ ...n, [key]: final }));
+    if (final !== prev) logEvent("rename", `Renombró "${prev}" → "${final}"`);
     setEditName(null);
   }
 
@@ -196,6 +263,9 @@ function App() {
         <div className="wrap">
           <div className="util-bar">
             {fb && user && <UserChip user={user} />}
+            <button className="util-btn" onClick={() => setShowHistory(true)} title="Ver historial de actividad">
+              <IconHistory /> Historial
+            </button>
             <button className="util-btn" onClick={() => window.print()} title="Exportar como PDF">
               <IconDownload /> Exportar PDF
             </button>
@@ -276,6 +346,8 @@ function App() {
             <TweakSection label="Marca" />
             <TweakToggle label="Ícono diamante" value={t.showDiamond} onChange={(v) => setTweak("showDiamond", v)} />
           </TweaksPanel>
+
+          {showHistory && <HistoryModal history={history} onClose={() => setShowHistory(false)} />}
         </div>
       </div>
 
@@ -344,6 +416,44 @@ function UserChip({ user }) {
         ? <img className="uc-avatar" src={user.photoURL} alt="" referrerPolicy="no-referrer" onError={() => setImgOk(false)} />
         : <span className="uc-avatar fallback">{initial}</span>}
       <span className="uc-name">{label}</span>
+    </div>
+  );
+}
+
+/* -------------------------- History modal ------------------------- */
+function HistoryModal({ history, onClose }) {
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const labels = { add: "Agregado", edit: "Editado", settle: "Saldado", reopen: "Reabierto", delete: "Eliminado", rename: "Renombrado" };
+
+  return (
+    <div className="hist-overlay" onClick={onClose}>
+      <div className="hist-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Historial de actividad">
+        <div className="hist-head">
+          <div>
+            <div className="hist-title">Historial</div>
+            <div className="hist-sub">{history.length} {history.length === 1 ? "movimiento registrado" : "movimientos registrados"}</div>
+          </div>
+          <button className="icon-btn" title="Cerrar" onClick={onClose}><IconX /></button>
+        </div>
+        <div className="hist-body">
+          {history.length === 0
+            ? <div className="hist-empty">Aún no hay actividad. Cada acción —agregar, editar, saldar, reabrir o eliminar— quedará registrada aquí con su fecha y hora.</div>
+            : history.map((e) => (
+                <div className="hist-item" key={e.id}>
+                  <span className={"hist-dot " + e.type} title={labels[e.type] || ""} />
+                  <div className="hist-main">
+                    <div className="hist-text">{e.text}</div>
+                    <div className="hist-meta num">{relTime(e.ts)} · {fmtDateTime(e.ts)}{e.by ? " · " + e.by : ""}</div>
+                  </div>
+                </div>
+              ))}
+        </div>
+      </div>
     </div>
   );
 }
@@ -420,6 +530,11 @@ function Row(props) {
           {it.desc}
           {it.settled && <span className="saldado-tag">Saldado</span>}
         </div>
+        {(it.settled ? it.settledAt : it.createdAt) && (
+          <div className="row-date num">
+            {it.settled ? `Saldado · ${fmtDate(it.settledAt)}` : fmtDate(it.createdAt)}
+          </div>
+        )}
       </div>
       <span className={"row-amount num " + side}>{fmt(it.amount)}</span>
       <div className="row-actions">
@@ -483,7 +598,7 @@ function PrintStatement({ names, diegoItems, socioItems, diegoTotal, socioTotal,
           {lines.map(({ k, it }, idx) => (
             <tr key={it.id}>
               <td className="n num">{idx + 1}</td>
-              <td className="desc">{it.desc}</td>
+              <td className="desc">{it.desc}{it.createdAt ? <span className="ps-date"> · {fmtDate(it.createdAt)}</span> : null}</td>
               <td className="r num">{k === "d" ? fmt(it.amount) : "—"}</td>
               <td className="r num">{k === "s" ? fmt(it.amount) : "—"}</td>
             </tr>
@@ -516,7 +631,7 @@ function PrintStatement({ names, diegoItems, socioItems, diegoTotal, socioTotal,
           <div className="ps-section-label">Ítems saldados <span className="muted">(no computan en el saldo)</span></div>
           {settled.map((it) => (
             <div className="it" key={it.id}>
-              <span>{it.desc} · a favor de {it.amount > 0 ? names.diego : names.socio}</span>
+              <span>{it.desc} · a favor de {it.amount > 0 ? names.diego : names.socio}{it.settledAt ? ` · saldado ${fmtDate(it.settledAt)}` : ""}</span>
               <span className="num">{fmt(it.amount)}</span>
             </div>
           ))}
