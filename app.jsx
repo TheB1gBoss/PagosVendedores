@@ -264,10 +264,10 @@ function App() {
           <div className="util-bar">
             {fb && user && <UserChip user={user} />}
             <button className="util-btn" onClick={() => setShowHistory(true)} title="Ver historial de actividad">
-              <IconHistory /> Historial
+              <IconHistory /> <span className="util-label">Historial</span>
             </button>
             <button className="util-btn" onClick={() => window.print()} title="Exportar como PDF">
-              <IconDownload /> Exportar PDF
+              <IconDownload /> <span className="util-label">Exportar PDF</span>
             </button>
             {themeToggle}
             {fb && user && (
