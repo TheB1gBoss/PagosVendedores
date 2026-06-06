@@ -16,10 +16,11 @@
 // ============================================================================
 
 window.firebaseConfig = {
-  apiKey:            "TU_API_KEY",
-  authDomain:        "TU_PROYECTO.firebaseapp.com",
-  projectId:         "TU_PROYECTO",
-  storageBucket:     "TU_PROYECTO.appspot.com",
-  messagingSenderId: "TU_SENDER_ID",
-  appId:             "TU_APP_ID",
+  apiKey:            "AIzaSyAHOCXTPy-Gn-2lP8bWKac85hVaw8JraeE",
+  authDomain:        "pagosvendedores.firebaseapp.com",
+  projectId:         "pagosvendedores",
+  storageBucket:     "pagosvendedores.firebasestorage.app",
+  messagingSenderId: "706059648538",
+  appId:             "1:706059648538:web:9964a061528fbd1039dba3",
+  measurementId:     "G-0XYNXD3RH1",
 };
