@@ -72,16 +72,60 @@ const fb = (() => {
 function useAuth() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(!fb); // sin Firebase: listo de inmediato
+  const [authError, setAuthError] = useState("");
   useEffect(() => {
     if (!fb) return;
+    // Completa el flujo de redirección (usado en móvil) y captura errores.
+    fb.auth.getRedirectResult().catch((e) => {
+      console.error("[Auth] Error de redirección:", e);
+      setAuthError(translateAuthError(e));
+    });
     return fb.auth.onAuthStateChanged((u) => { setUser(u); setReady(true); });
   }, []);
-  return { user, ready };
+  return { user, ready, authError };
+}
+
+// Detecta dispositivos táctiles/móviles, donde los popups suelen fallar.
+const isMobileDevice = () =>
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent || "") ||
+  (window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches);
+
+// Traduce los códigos de error de Firebase Auth a mensajes claros en español.
+function translateAuthError(e) {
+  switch (e && e.code) {
+    case "auth/unauthorized-domain":
+      return "Este dominio no está autorizado en Firebase. Agrégalo en Authentication → Settings → Dominios autorizados.";
+    case "auth/operation-not-allowed":
+      return "El acceso con Google no está habilitado en Firebase (Authentication → Sign-in method).";
+    case "auth/network-request-failed":
+      return "Sin conexión. Revisa tu internet e inténtalo de nuevo.";
+    case "auth/account-exists-with-different-credential":
+      return "Ya existe una cuenta con ese correo usando otro método de acceso.";
+    case "auth/popup-closed-by-user":
+    case "auth/cancelled-popup-request":
+      return ""; // el usuario canceló: no mostramos error
+    default:
+      return e && e.message ? e.message : "No se pudo iniciar sesión.";
+  }
 }
 
 async function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
-  await fb.auth.signInWithPopup(provider);
+  provider.setCustomParameters({ prompt: "select_account" });
+  // En móvil usamos redirección (los popups suelen ser bloqueados o fallar).
+  if (isMobileDevice()) {
+    await fb.auth.signInWithRedirect(provider);
+    return; // la página navega a Google; al volver se procesa el resultado
+  }
+  // En escritorio intentamos popup y, si el navegador lo bloquea, redirección.
+  try {
+    await fb.auth.signInWithPopup(provider);
+  } catch (e) {
+    const redirectable = ["auth/popup-blocked", "auth/cancelled-popup-request",
+      "auth/operation-not-supported-in-this-environment", "auth/web-storage-unsupported"];
+    if (redirectable.includes(e.code)) { await fb.auth.signInWithRedirect(provider); return; }
+    throw e;
+  }
 }
 
 /* ----------------------------- Seed data -------------------------- */
@@ -101,7 +145,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 /* ------------------------------ App ------------------------------- */
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { user, ready } = useAuth();
+  const { user, ready, authError } = useAuth();
 
   const [theme, setTheme] = useState(() => localStorage.getItem("bc-theme") || "light");
   useEffect(() => {
@@ -255,7 +299,7 @@ function App() {
 
   // Pantallas de control de sesión (solo cuando Firebase está configurado).
   if (fb && !ready) return <FullScreenLoader />;
-  if (fb && !user) return <LoginScreen themeToggle={themeToggle} showDiamond={t.showDiamond} />;
+  if (fb && !user) return <LoginScreen themeToggle={themeToggle} showDiamond={t.showDiamond} authError={authError} />;
 
   return (
     <React.Fragment>
@@ -367,7 +411,7 @@ function FullScreenLoader() {
   );
 }
 
-function LoginScreen({ themeToggle, showDiamond }) {
+function LoginScreen({ themeToggle, showDiamond, authError }) {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
 
@@ -375,11 +419,12 @@ function LoginScreen({ themeToggle, showDiamond }) {
     setErr(""); setBusy(true);
     try {
       await signInWithGoogle();
+      // Si fue por redirección, la página ya navegó; con popup, el cambio de
+      // sesión lo gestiona onAuthStateChanged.
     } catch (e) {
-      // El usuario cierra el popup → no es un error que mostrar.
-      if (e && e.code === "auth/popup-closed-by-user") { setBusy(false); return; }
       console.error("[Auth] Error al iniciar sesión:", e);
-      setErr(e && e.message ? e.message : "No se pudo iniciar sesión.");
+      const msg = translateAuthError(e);
+      if (msg) setErr(msg);
       setBusy(false);
     }
   }
@@ -399,7 +444,7 @@ function LoginScreen({ themeToggle, showDiamond }) {
           <button className="btn-google" onClick={handleSignIn} disabled={busy}>
             <GoogleG />{busy ? "Conectando…" : "Continuar con Google"}
           </button>
-          <div className="gate-err">{err}</div>
+          <div className="gate-err">{err || authError}</div>
         </div>
       </div>
     </React.Fragment>
