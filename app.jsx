@@ -25,7 +25,6 @@ const IconDownload = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill
 const IconMoon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8Z"/></svg>);
 const IconSun = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>);
 const IconLogout = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>);
-const GoogleG = () => (<svg className="g-ico" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>);
 const IconHistory = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>);
 
 /* --------------------------- Formatting --------------------------- */
@@ -72,59 +71,51 @@ const fb = (() => {
 function useAuth() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(!fb); // sin Firebase: listo de inmediato
-  const [authError, setAuthError] = useState("");
   useEffect(() => {
     if (!fb) return;
-    // Completa el flujo de redirección (usado en móvil) y captura errores.
-    fb.auth.getRedirectResult().catch((e) => {
-      console.error("[Auth] Error de redirección:", e);
-      setAuthError(translateAuthError(e));
-    });
     return fb.auth.onAuthStateChanged((u) => { setUser(u); setReady(true); });
   }, []);
-  return { user, ready, authError };
+  return { user, ready };
 }
 
-// Detecta dispositivos táctiles/móviles, donde los popups suelen fallar.
-const isMobileDevice = () =>
-  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent || "") ||
-  (window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches);
+// El acceso es por usuario + contraseña. Firebase Auth trabaja con email, así
+// que mapeamos el usuario a un email sintético (no se envían correos): el
+// usuario "diego" se guarda como "diego@pagosvendedores.app".
+const usernameToEmail = (u) => `${String(u).trim().toLowerCase()}@pagosvendedores.app`;
+
+async function signInWithUsername(username, password) {
+  await fb.auth.signInWithEmailAndPassword(usernameToEmail(username), password);
+}
+
+async function registerWithUsername(username, password) {
+  const cred = await fb.auth.createUserWithEmailAndPassword(usernameToEmail(username), password);
+  // Guardamos el usuario como nombre visible para mostrarlo en la interfaz.
+  if (cred && cred.user && cred.user.updateProfile) {
+    try { await cred.user.updateProfile({ displayName: String(username).trim().toLowerCase() }); } catch (e) {}
+  }
+}
 
 // Traduce los códigos de error de Firebase Auth a mensajes claros en español.
 function translateAuthError(e) {
   switch (e && e.code) {
-    case "auth/unauthorized-domain":
-      return "Este dominio no está autorizado en Firebase. Agrégalo en Authentication → Settings → Dominios autorizados.";
+    case "auth/invalid-credential":
+    case "auth/wrong-password":
+    case "auth/user-not-found":
+      return "Usuario o contraseña incorrectos.";
+    case "auth/email-already-in-use":
+      return "Ese usuario ya existe. Inicia sesión.";
+    case "auth/weak-password":
+      return "La contraseña debe tener al menos 6 caracteres.";
+    case "auth/invalid-email":
+      return "Usuario inválido. Usa solo letras y números.";
+    case "auth/too-many-requests":
+      return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
     case "auth/operation-not-allowed":
-      return "El acceso con Google no está habilitado en Firebase (Authentication → Sign-in method).";
+      return "El acceso con usuario y contraseña no está habilitado en Firebase (Authentication → Sign-in method → Email/Password).";
     case "auth/network-request-failed":
       return "Sin conexión. Revisa tu internet e inténtalo de nuevo.";
-    case "auth/account-exists-with-different-credential":
-      return "Ya existe una cuenta con ese correo usando otro método de acceso.";
-    case "auth/popup-closed-by-user":
-    case "auth/cancelled-popup-request":
-      return ""; // el usuario canceló: no mostramos error
     default:
       return e && e.message ? e.message : "No se pudo iniciar sesión.";
-  }
-}
-
-async function signInWithGoogle() {
-  const provider = new firebase.auth.GoogleAuthProvider();
-  provider.setCustomParameters({ prompt: "select_account" });
-  // En móvil usamos redirección (los popups suelen ser bloqueados o fallar).
-  if (isMobileDevice()) {
-    await fb.auth.signInWithRedirect(provider);
-    return; // la página navega a Google; al volver se procesa el resultado
-  }
-  // En escritorio intentamos popup y, si el navegador lo bloquea, redirección.
-  try {
-    await fb.auth.signInWithPopup(provider);
-  } catch (e) {
-    const redirectable = ["auth/popup-blocked", "auth/cancelled-popup-request",
-      "auth/operation-not-supported-in-this-environment", "auth/web-storage-unsupported"];
-    if (redirectable.includes(e.code)) { await fb.auth.signInWithRedirect(provider); return; }
-    throw e;
   }
 }
 
@@ -145,7 +136,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 /* ------------------------------ App ------------------------------- */
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { user, ready, authError } = useAuth();
+  const { user, ready } = useAuth();
 
   const [theme, setTheme] = useState(() => localStorage.getItem("bc-theme") || "light");
   useEffect(() => {
@@ -299,7 +290,7 @@ function App() {
 
   // Pantallas de control de sesión (solo cuando Firebase está configurado).
   if (fb && !ready) return <FullScreenLoader />;
-  if (fb && !user) return <LoginScreen themeToggle={themeToggle} showDiamond={t.showDiamond} authError={authError} />;
+  if (fb && !user) return <LoginScreen themeToggle={themeToggle} showDiamond={t.showDiamond} />;
 
   return (
     <React.Fragment>
@@ -411,20 +402,32 @@ function FullScreenLoader() {
   );
 }
 
-function LoginScreen({ themeToggle, showDiamond, authError }) {
+function LoginScreen({ themeToggle, showDiamond }) {
+  const [mode, setMode] = useState("login"); // "login" | "register"
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const isRegister = mode === "register";
 
-  async function handleSignIn() {
-    setErr(""); setBusy(true);
+  async function submit(e) {
+    if (e) e.preventDefault();
+    setErr("");
+    const u = username.trim().toLowerCase();
+    if (!/^[a-z0-9_.-]{3,}$/.test(u)) {
+      setErr("El usuario debe tener al menos 3 caracteres (letras, números, . _ -)."); return;
+    }
+    if (password.length < 6) {
+      setErr("La contraseña debe tener al menos 6 caracteres."); return;
+    }
+    setBusy(true);
     try {
-      await signInWithGoogle();
-      // Si fue por redirección, la página ya navegó; con popup, el cambio de
-      // sesión lo gestiona onAuthStateChanged.
-    } catch (e) {
-      console.error("[Auth] Error al iniciar sesión:", e);
-      const msg = translateAuthError(e);
-      if (msg) setErr(msg);
+      if (isRegister) await registerWithUsername(u, password);
+      else await signInWithUsername(u, password);
+      // El resto lo gestiona onAuthStateChanged.
+    } catch (e2) {
+      console.error("[Auth] Error al iniciar sesión:", e2);
+      setErr(translateAuthError(e2));
       setBusy(false);
     }
   }
@@ -440,11 +443,25 @@ function LoginScreen({ themeToggle, showDiamond, authError }) {
           <div className="gate-title">Pagos Vendedores</div>
           <div className="gate-sub">Libro de saldos &amp; cuentas</div>
           <div className="gate-rule" />
-          <div className="gate-text">Inicia sesión para acceder a tu libro de saldos y mantenerlo guardado en la nube.</div>
-          <button className="btn-google" onClick={handleSignIn} disabled={busy}>
-            <GoogleG />{busy ? "Conectando…" : "Continuar con Google"}
+          <div className="gate-text">
+            {isRegister ? "Crea tu cuenta con un usuario y una contraseña." : "Ingresa con tu usuario y contraseña."}
+          </div>
+          <form className="gate-form" onSubmit={submit}>
+            <input className="input" type="text" placeholder="Usuario" value={username}
+                   autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck="false"
+                   onChange={(e) => setUsername(e.target.value)} />
+            <input className="input" type="password" placeholder="Contraseña" value={password}
+                   autoComplete={isRegister ? "new-password" : "current-password"}
+                   onChange={(e) => setPassword(e.target.value)} />
+            <button className="btn-google" type="submit" disabled={busy}>
+              {busy ? "Un momento…" : (isRegister ? "Crear cuenta" : "Iniciar sesión")}
+            </button>
+          </form>
+          <div className="gate-err">{err}</div>
+          <button type="button" className="gate-switch"
+                  onClick={() => { setErr(""); setMode(isRegister ? "login" : "register"); }}>
+            {isRegister ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Crear una"}
           </button>
-          <div className="gate-err">{err || authError}</div>
         </div>
       </div>
     </React.Fragment>
@@ -453,7 +470,8 @@ function LoginScreen({ themeToggle, showDiamond, authError }) {
 
 function UserChip({ user }) {
   const [imgOk, setImgOk] = useState(true);
-  const label = user.displayName || user.email || "Cuenta";
+  const label = user.displayName
+    || (user.email ? user.email.replace(/@pagosvendedores\.app$/, "") : "Cuenta");
   const initial = (label.trim()[0] || "?").toUpperCase();
   return (
     <div className="user-chip" title={user.email || label}>

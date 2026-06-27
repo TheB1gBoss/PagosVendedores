@@ -242,7 +242,16 @@
   .btn-google:active { transform: translateY(1px); }
   .btn-google:disabled { opacity: .6; cursor: default; }
   .btn-google .g-ico { width: 18px; height: 18px; background: #fff; border-radius: 3px; padding: 1px; flex: none; }
-  .gate-err { font-size: 12.5px; color: #d6453c; margin-top: 16px; min-height: 16px; }
+  .gate-form { display: flex; flex-direction: column; gap: 11px; text-align: left; }
+  .gate-form .input { height: 46px; }
+  .gate-form .btn-google { margin-top: 5px; }
+  .gate-switch {
+    appearance: none; border: 0; background: transparent; cursor: pointer; font-family: inherit;
+    color: var(--text-2); font-size: 12.5px; font-weight: 600; margin-top: 16px; padding: 6px;
+    text-decoration: underline; text-underline-offset: 3px; text-decoration-color: var(--hairline-strong);
+  }
+  .gate-switch:hover { color: var(--text); }
+  .gate-err { font-size: 12.5px; color: #d6453c; margin-top: 14px; min-height: 16px; }
   .gate-note { font-size: 11.5px; color: var(--muted); margin-top: 22px; line-height: 1.5; }
   .gate-note code { font-family: ui-monospace, Menlo, monospace; font-size: 11px; background: var(--surface-3); padding: 1px 5px; border-radius: 4px; }
   .spinner { width: 26px; height: 26px; border: 2.5px solid var(--hairline); border-top-color: var(--ink); border-radius: 50%; animation: spin .7s linear infinite; }
