@@ -79,19 +79,29 @@ function useAuth() {
 }
 
 // El acceso es por usuario + contraseña. Firebase Auth trabaja con email, así
-// que mapeamos el usuario a un email sintético (no se envían correos): el
-// usuario "diego" se guarda como "diego@pagosvendedores.app".
-const usernameToEmail = (u) => `${String(u).trim().toLowerCase()}@pagosvendedores.app`;
+// que mapeamos el usuario a un email sintético interno (no se envían correos).
+// Para admitir cualquier usuario (con espacios, mayúsculas, acentos…) se
+// codifican sus bytes a hexadecimal, formando un email siempre válido y único.
+const normalizeUsername = (u) => String(u).trim().replace(/\s+/g, " ");
+function usernameToEmail(u) {
+  const norm = normalizeUsername(u).toLowerCase();
+  let hex = "";
+  for (const b of new TextEncoder().encode(norm)) hex += b.toString(16).padStart(2, "0");
+  return "u" + hex + "@pagosvendedores.app";
+}
+// Firebase exige contraseñas de ≥6 caracteres; rellenamos por dentro las más
+// cortas para no imponerle ninguna restricción al usuario.
+const padPassword = (p) => { const s = String(p); return s.length >= 6 ? s : s.padEnd(6, "·"); };
 
 async function signInWithUsername(username, password) {
-  await fb.auth.signInWithEmailAndPassword(usernameToEmail(username), password);
+  await fb.auth.signInWithEmailAndPassword(usernameToEmail(username), padPassword(password));
 }
 
 async function registerWithUsername(username, password) {
-  const cred = await fb.auth.createUserWithEmailAndPassword(usernameToEmail(username), password);
-  // Guardamos el usuario como nombre visible para mostrarlo en la interfaz.
+  const cred = await fb.auth.createUserWithEmailAndPassword(usernameToEmail(username), padPassword(password));
+  // Guardamos el usuario tal cual lo escribió, como nombre visible.
   if (cred && cred.user && cred.user.updateProfile) {
-    try { await cred.user.updateProfile({ displayName: String(username).trim().toLowerCase() }); } catch (e) {}
+    try { await cred.user.updateProfile({ displayName: normalizeUsername(username) }); } catch (e) {}
   }
 }
 
@@ -413,13 +423,9 @@ function LoginScreen({ themeToggle, showDiamond }) {
   async function submit(e) {
     if (e) e.preventDefault();
     setErr("");
-    const u = username.trim().toLowerCase();
-    if (!/^[a-z0-9_.-]{3,}$/.test(u)) {
-      setErr("El usuario debe tener al menos 3 caracteres (letras, números, . _ -)."); return;
-    }
-    if (password.length < 6) {
-      setErr("La contraseña debe tener al menos 6 caracteres."); return;
-    }
+    const u = username.trim();
+    if (u.replace(/\s+/g, "").length < 2) { setErr("Escribe tu usuario."); return; }
+    if (password.length < 1) { setErr("Escribe tu contraseña."); return; }
     setBusy(true);
     try {
       if (isRegister) await registerWithUsername(u, password);
@@ -433,38 +439,34 @@ function LoginScreen({ themeToggle, showDiamond }) {
   }
 
   return (
-    <React.Fragment>
-      <div className="util-bar" style={{ padding: "20px 24px 0", maxWidth: 1060, margin: "0 auto" }}>
-        {themeToggle}
-      </div>
-      <div className="gate">
-        <div className="gate-card">
-          {showDiamond && <Diamond size={40} stroke={1.4} />}
-          <div className="gate-title">Pagos Vendedores</div>
-          <div className="gate-sub">Libro de saldos &amp; cuentas</div>
-          <div className="gate-rule" />
-          <div className="gate-text">
-            {isRegister ? "Crea tu cuenta con un usuario y una contraseña." : "Ingresa con tu usuario y contraseña."}
-          </div>
-          <form className="gate-form" onSubmit={submit}>
-            <input className="input" type="text" placeholder="Usuario" value={username}
-                   autoComplete="username" autoCapitalize="none" autoCorrect="off" spellCheck="false"
-                   onChange={(e) => setUsername(e.target.value)} />
-            <input className="input" type="password" placeholder="Contraseña" value={password}
-                   autoComplete={isRegister ? "new-password" : "current-password"}
-                   onChange={(e) => setPassword(e.target.value)} />
-            <button className="btn-google" type="submit" disabled={busy}>
-              {busy ? "Un momento…" : (isRegister ? "Crear cuenta" : "Iniciar sesión")}
-            </button>
-          </form>
-          <div className="gate-err">{err}</div>
-          <button type="button" className="gate-switch"
-                  onClick={() => { setErr(""); setMode(isRegister ? "login" : "register"); }}>
-            {isRegister ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Crear una"}
-          </button>
+    <div className="gate gate-auth">
+      <div className="gate-theme">{themeToggle}</div>
+      <div className="gate-card">
+        {showDiamond && <Diamond size={40} stroke={1.4} />}
+        <div className="gate-title">Pagos Vendedores</div>
+        <div className="gate-sub">Libro de saldos &amp; cuentas</div>
+        <div className="gate-rule" />
+        <div className="gate-text">
+          {isRegister ? "Crea tu cuenta con un usuario y una contraseña." : "Ingresa con tu usuario y contraseña."}
         </div>
+        <form className="gate-form" onSubmit={submit}>
+          <input className="input" type="text" placeholder="Usuario" value={username}
+                 autoComplete="username" autoCorrect="off" spellCheck="false"
+                 onChange={(e) => setUsername(e.target.value)} />
+          <input className="input" type="password" placeholder="Contraseña" value={password}
+                 autoComplete={isRegister ? "new-password" : "current-password"}
+                 onChange={(e) => setPassword(e.target.value)} />
+          <button className="btn-google" type="submit" disabled={busy}>
+            {busy ? "Un momento…" : (isRegister ? "Crear cuenta" : "Iniciar sesión")}
+          </button>
+        </form>
+        <div className="gate-err">{err}</div>
+        <button type="button" className="gate-switch"
+                onClick={() => { setErr(""); setMode(isRegister ? "login" : "register"); }}>
+          {isRegister ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Crear una"}
+        </button>
       </div>
-    </React.Fragment>
+    </div>
   );
 }
 
