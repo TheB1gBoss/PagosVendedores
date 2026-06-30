@@ -304,6 +304,124 @@
   .hist-text { font-size: 13.5px; color: var(--text); line-height: 1.35; }
   .hist-meta { font-size: 11px; color: var(--muted); margin-top: 3px; }
 
+  /* ===================== EMPRESA / SOCIO (ledger) ===================== */
+  .col-head.empresa { background: var(--tint); }
+  .col-tick.empresa { background: var(--ink); }
+  .row-amount.empresa { color: var(--text); }
+  .subtotal.empresa { color: var(--text); }
+  .result-tick.empresa { background: var(--ink-contrast); }
+  .col-name-static { cursor: default; }
+  .col-name-static:hover { background: transparent; }
+
+  /* ===================== COMPANY HEADER ===================== */
+  .brand-title { cursor: text; border-radius: 6px; padding: 1px 8px; transition: background .15s; }
+  .brand-title:hover { background: var(--tint); }
+  .company-input { font-family: var(--serif); font-size: 38px; font-weight: 400; text-align: center; color: var(--text); background: var(--bg); border: 1px solid var(--hairline-strong); border-radius: 9px; padding: 2px 12px; max-width: 92%; }
+  .company-input:focus { outline: none; }
+  .company-input.small { font-size: 24px; text-align: left; max-width: 100%; width: 200px; }
+
+  /* ===================== PERIOD BAR ===================== */
+  .period-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+  .period-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  .period-eyebrow { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .period-select-wrap { position: relative; }
+  .period-select { appearance: none; -webkit-appearance: none; font-family: inherit; font-size: 13.5px; font-weight: 600; color: var(--text); background: var(--surface-1); border: 1px solid var(--hairline); border-radius: 9px; height: 38px; padding: 0 34px 0 14px; cursor: pointer; }
+  .period-select-wrap::after { content: ""; position: absolute; right: 14px; top: 50%; width: 7px; height: 7px; border-right: 1.5px solid var(--muted); border-bottom: 1.5px solid var(--muted); transform: translateY(-65%) rotate(45deg); pointer-events: none; }
+  .period-badge { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; font-weight: 700; color: var(--muted); border: 1px solid var(--hairline-strong); border-radius: 5px; padding: 3px 7px; }
+  .btn-close-month { appearance: none; cursor: pointer; font-family: inherit; height: 38px; padding: 0 16px; border-radius: 9px; background: var(--surface-1); color: var(--text-2); border: 1px solid var(--hairline-strong); font-size: 12.5px; font-weight: 600; display: flex; align-items: center; gap: 8px; transition: border-color .16s, color .16s; }
+  .btn-close-month:hover { border-color: var(--ink); color: var(--text); }
+
+  /* ===================== OVERVIEW ===================== */
+  .totals { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 28px; }
+  .total-card { background: var(--surface-1); border: 1px solid var(--hairline); border-radius: 14px; padding: 16px 18px; box-shadow: 0 18px 40px -32px var(--shadow); }
+  .total-lbl { font-size: 11px; color: var(--muted); font-weight: 600; margin-bottom: 7px; }
+  .total-val { font-size: 24px; font-weight: 600; color: var(--text); }
+  .total-val.up { color: #2f9e63; }
+  .total-val.down { color: #c2603a; }
+
+  .ov-head { display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 12px; padding: 0 2px; }
+  .ov-title { font-family: var(--serif); font-size: 20px; color: var(--text); }
+  .ov-count { font-size: 13px; color: var(--muted); }
+
+  .pcards { display: flex; flex-direction: column; gap: 10px; }
+  .pcard { position: relative; display: flex; align-items: center; gap: 12px; background: var(--surface-1); border: 1px solid var(--hairline); border-radius: 13px; padding: 15px 14px 15px 16px; cursor: pointer; transition: border-color .16s, transform .08s; box-shadow: 0 14px 34px -32px var(--shadow); }
+  .pcard:hover { border-color: var(--hairline-strong); }
+  .pcard:active { transform: translateY(1px); }
+  .pcard-main { flex: 1; min-width: 0; }
+  .pcard-name { font-size: 16px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pcard-status { font-size: 11.5px; font-weight: 600; margin-top: 3px; }
+  .pcard-status.up { color: #2f9e63; }
+  .pcard-status.down { color: #c2603a; }
+  .pcard-status.flat { color: var(--muted); }
+  .pcard-amount { font-size: 17px; font-weight: 700; white-space: nowrap; }
+  .pcard-amount.up { color: #2f9e63; }
+  .pcard-amount.down { color: #c2603a; }
+  .pcard-amount.flat { color: var(--faint); }
+  .pcard-del { opacity: 0; flex: none; }
+  .pcard:hover .pcard-del { opacity: 1; }
+  .pcard-arrow { color: var(--faint); display: flex; flex: none; }
+
+  .add-partner { margin-top: 16px; }
+  .util-btn.add-partner-btn { width: 100%; justify-content: center; height: 44px; padding: 0 16px; }
+  .add-partner-row { display: flex; gap: 10px; align-items: center; }
+  .add-partner-row .input { flex: 1; }
+
+  /* ===================== PARTNER DETAIL ===================== */
+  .detail-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; flex-wrap: wrap; }
+  .detail-name-wrap { flex: 1; min-width: 130px; }
+  .detail-eyebrow { font-size: 10px; letter-spacing: .16em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .detail-name { font-family: var(--serif); font-size: 26px; color: var(--text); cursor: text; line-height: 1.1; border-radius: 5px; padding: 0 5px; margin-left: -5px; transition: background .15s; }
+  .detail-name:hover { background: var(--tint); }
+  .export-bar { display: flex; gap: 8px; }
+  .readonly-note { background: var(--surface-2); border: 1px solid var(--hairline); border-radius: 9px; padding: 9px 13px; font-size: 12.5px; color: var(--muted); margin-bottom: 14px; }
+  .opening-line { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--surface-2); border: 1px dashed var(--hairline-strong); border-radius: 10px; padding: 11px 15px; margin-bottom: 16px; font-size: 13px; color: var(--text-2); font-weight: 500; }
+
+  /* ===================== STATEMENT (export) ===================== */
+  .sd-capture { position: fixed; left: -10000px; top: 0; width: 720px; pointer-events: none; }
+  .sd { width: 720px; box-sizing: border-box; background: #fff; color: #1a1a18; font-family: var(--sans); padding: 40px 44px; }
+  .sd-head { display: flex; align-items: flex-start; justify-content: space-between; border-bottom: 2.5px solid #1a1a18; padding-bottom: 18px; gap: 24px; }
+  .sd-brand { display: flex; align-items: center; gap: 14px; }
+  .sd-brand .diamond { color: #1a1a18; }
+  .sd-title { font-family: var(--serif); font-size: 28px; line-height: 1; }
+  .sd-sub { font-size: 9.5px; letter-spacing: .24em; text-transform: uppercase; color: #888; margin-top: 6px; }
+  .sd-meta { display: flex; flex-direction: column; gap: 5px; min-width: 230px; }
+  .sd-meta-row { display: flex; justify-content: space-between; gap: 18px; font-size: 11px; color: #777; border-bottom: 1px solid #eee; padding-bottom: 4px; }
+  .sd-meta-row strong { color: #1a1a18; font-weight: 600; }
+  .sd-section { font-size: 10px; letter-spacing: .18em; text-transform: uppercase; color: #888; font-weight: 700; margin: 26px 0 10px; }
+  .sd-table { width: 100%; border-collapse: collapse; }
+  .sd-table th { font-size: 9px; letter-spacing: .1em; text-transform: uppercase; color: #888; font-weight: 700; text-align: left; padding: 0 10px 9px; border-bottom: 1.5px solid #1a1a18; }
+  .sd-table th.r, .sd-table td.r { text-align: right; }
+  .sd-table th.n, .sd-table td.n { width: 28px; text-align: center; color: #aaa; padding-left: 0; padding-right: 0; }
+  .sd-table td { font-size: 13px; padding: 10px; border-bottom: 1px solid #ededea; font-variant-numeric: tabular-nums; }
+  .sd-table td.desc { color: #1a1a18; font-weight: 500; }
+  .sd-date { color: #aaa; font-weight: 400; font-size: 11px; }
+  .sd-table tbody tr:nth-child(even) td { background: #f7f7f4; }
+  .sd-note { color: #999; font-style: italic; padding: 16px 10px !important; }
+  .sd-sub-row td { border-top: 2px solid #1a1a18; border-bottom: none; padding-top: 12px; font-weight: 700; font-size: 13.5px; color: #1a1a18; background: none !important; }
+  .sd-sub-row td.lbl { letter-spacing: .08em; text-transform: uppercase; font-size: 10px; }
+  .sd-net { margin-top: 22px; border: 2.5px solid #1a1a18; padding: 20px 24px; display: flex; align-items: center; justify-content: space-between; gap: 20px; }
+  .sd-net-lbl { font-size: 9.5px; letter-spacing: .2em; text-transform: uppercase; color: #888; font-weight: 700; }
+  .sd-net-name { font-family: var(--serif); font-size: 24px; margin-top: 6px; }
+  .sd-net-note { font-size: 12px; color: #666; margin-top: 7px; }
+  .sd-net-amount { font-size: 38px; font-weight: 700; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .sd-net-amount .cur { font-size: 19px; color: #999; font-weight: 500; margin-right: 3px; }
+  .sd-sign { display: flex; gap: 56px; margin-top: 54px; }
+  .sd-sign .s { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+  .sd-sign .line { width: 100%; border-top: 1px solid #1a1a18; }
+  .sd-sign .cap { font-size: 12px; color: #555; }
+  .sd-foot { margin-top: 30px; font-size: 9.5px; letter-spacing: .04em; color: #aaa; text-align: center; }
+
+  /* Ajustes móviles de las nuevas pantallas */
+  @media (max-width: 720px) {
+    .totals { gap: 10px; }
+    .total-val { font-size: 20px; }
+    .detail-name { font-size: 22px; }
+  }
+  @media (max-width: 460px) {
+    .totals { grid-template-columns: 1fr; }
+    .company-input { font-size: 31px; }
+  }
+
   /* ===================== RESPONSIVE ===================== */
   /* Dispositivos táctiles: las acciones de fila no pueden depender de :hover */
   @media (hover: none) {
@@ -441,6 +559,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
   <script src="firebase-config.js"></script>
+
+  <!-- Exportar respaldo como imagen / PDF -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
   <script type="text/babel" src="tweaks-panel.jsx"></script>
   <script type="text/babel" src="app.jsx"></script>
