@@ -22,6 +22,7 @@ const IconDownload = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill
 const IconImage = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2.5"/><circle cx="8.5" cy="8.5" r="1.8"/><path d="m21 15-5-5L5 21"/></svg>);
 const IconPdf = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>);
 const IconLock = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="11" width="17" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>);
+const IconUnlock = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><rect x="3.5" y="11" width="17" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>);
 const IconBack = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 18l-6-6 6-6"/></svg>);
 const IconArrow = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 18l6-6-6-6"/></svg>);
 const IconUserPlus = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M19 8v6M22 11h-6"/></svg>);
@@ -142,6 +143,26 @@ function partnerNet(period, partnerId) {
   const { opening, items } = partnerLedger(period, partnerId);
   return opening + items.filter((i) => !i.settled).reduce((s, i) => s + i.amount, 0);
 }
+// Recalcula el saldo inicial (opening) de cada mes = neto del mes anterior, en
+// orden cronológico. Así, al editar un mes reabierto, el arrastre de los meses
+// siguientes se actualiza en cascada automáticamente. El primer mes conserva su
+// saldo inicial (ancla, normalmente 0).
+function recomputeOpenings(periods, partners) {
+  const months = Object.keys(periods).sort();
+  const out = {};
+  months.forEach((mk) => { out[mk] = periods[mk]; });
+  partners.forEach((p) => {
+    let prevNet = null;
+    months.forEach((mk, idx) => {
+      const per = out[mk];
+      const pl = partnerLedger(per, p.id);
+      const opening = idx === 0 ? pl.opening : prevNet;
+      out[mk] = { ...per, ledgers: { ...per.ledgers, [p.id]: { opening, items: pl.items } } };
+      prevNet = opening + pl.items.filter((i) => !i.settled).reduce((s, i) => s + i.amount, 0);
+    });
+  });
+  return out;
+}
 
 const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
   "showDiamond": true
@@ -237,7 +258,9 @@ function App() {
       const per = prev[activeMonth] || { closed: false, ledgers: {} };
       if (per.closed) return prev;
       const pl = partnerLedger(per, partnerId);
-      return { ...prev, [activeMonth]: { ...per, ledgers: { ...per.ledgers, [partnerId]: { opening: pl.opening, items: updater(pl.items) } } } };
+      const applied = { ...prev, [activeMonth]: { ...per, ledgers: { ...per.ledgers, [partnerId]: { opening: pl.opening, items: updater(pl.items) } } } };
+      // Recalcula el arrastre hacia los meses siguientes (mantiene saldos correctos).
+      return recomputeOpenings(applied, partners);
     });
   }
   const parseAmt = (v) => { const n = parseInt(String(v).replace(/[^\d]/g, ""), 10); return isNaN(n) ? 0 : n; };
@@ -321,13 +344,33 @@ function App() {
     const next = nextMonth(openMonth);
     setPeriods((prev) => {
       const cur = prev[openMonth];
-      const nextLedgers = {};
-      partners.forEach((p) => { nextLedgers[p.id] = { opening: partnerNet(cur, p.id), items: [] }; });
-      return { ...prev, [openMonth]: { ...cur, closed: true, closedAt: Date.now() }, [next]: { closed: false, closedAt: null, ledgers: nextLedgers } };
+      const withNext = { ...prev, [openMonth]: { ...cur, closed: true, closedAt: Date.now() }, [next]: { closed: false, closedAt: null, ledgers: {} } };
+      return recomputeOpenings(withNext, partners); // llena los saldos iniciales del mes nuevo
     });
     setOpenMonth(next); setSelectedMonth(next);
     setView({ screen: "overview", partnerId: null });
     logEvent("close", `Cerró ${monthLabel(openMonth)} y abrió ${monthLabel(next)}`);
+  }
+  // Reabre un mes cerrado para poder editarlo (recalcula el arrastre en cascada).
+  function reopenMonth(mk) {
+    if (!periods[mk] || !periods[mk].closed) return;
+    if (!window.confirm(`¿Reabrir ${monthLabel(mk)} para editar? Los saldos iniciales de los meses siguientes se recalcularán automáticamente al guardar los cambios.`)) return;
+    setPeriods((prev) => {
+      const per = prev[mk]; if (!per) return prev;
+      return recomputeOpenings({ ...prev, [mk]: { ...per, closed: false } }, partners);
+    });
+    setSelectedMonth(mk);
+    setView({ screen: "overview", partnerId: null });
+    logEvent("close", `Reabrió ${monthLabel(mk)} para edición`);
+  }
+  // Vuelve a cerrar un mes reabierto (no crea un mes nuevo; solo lo bloquea).
+  function reCloseMonth(mk) {
+    if (!periods[mk] || periods[mk].closed) return;
+    setPeriods((prev) => {
+      const per = prev[mk]; if (!per) return prev;
+      return recomputeOpenings({ ...prev, [mk]: { ...per, closed: true, closedAt: Date.now() } }, partners);
+    });
+    logEvent("close", `Volvió a cerrar ${monthLabel(mk)}`);
   }
 
   /* ---- Navegación ---- */
@@ -367,8 +410,11 @@ function App() {
 
         <CompanyHeader company={company} showDiamond={t.showDiamond} onRename={renameCompany} />
 
-        <PeriodBar months={monthsList} activeMonth={activeMonth} openMonth={openMonth} closed={period.closed}
-                   onSelect={setSelectedMonth} onClose={closeMonth} />
+        <PeriodBar
+          months={monthsList.map((k) => ({ key: k, closed: !!(periods[k] && periods[k].closed) }))}
+          activeMonth={activeMonth} openMonth={openMonth} closed={period.closed}
+          onSelect={setSelectedMonth} onClose={closeMonth}
+          onReopen={() => reopenMonth(activeMonth)} onReclose={() => reCloseMonth(activeMonth)} />
 
         {view.screen === "overview" ? (
           <Overview company={company} partners={partners} period={period}
@@ -414,23 +460,32 @@ function CompanyHeader({ company, showDiamond, onRename }) {
 }
 
 /* --------------------------- Period bar --------------------------- */
-function PeriodBar({ months, activeMonth, openMonth, closed, onSelect, onClose }) {
+function PeriodBar({ months, activeMonth, openMonth, closed, onSelect, onClose, onReopen, onReclose }) {
+  const sorted = months.slice().sort((a, b) => (a.key < b.key ? 1 : -1));
   return (
     <div className="period-bar">
       <div className="period-left">
         <span className="period-eyebrow">Periodo</span>
         <div className="period-select-wrap">
           <select className="period-select" value={activeMonth} onChange={(e) => onSelect(e.target.value)}>
-            {months.slice().sort().reverse().map((k) => (
-              <option key={k} value={k}>{monthLabel(k)}{k === openMonth ? " · abierto" : " · cerrado"}</option>
+            {sorted.map((m) => (
+              <option key={m.key} value={m.key}>{monthLabel(m.key)}{m.closed ? " · cerrado" : " · abierto"}</option>
             ))}
           </select>
         </div>
         {closed && <span className="period-badge">Cerrado</span>}
       </div>
-      {activeMonth === openMonth && !closed && (
+      {closed ? (
+        <button className="btn-close-month" onClick={onReopen} title="Reabrir este mes para editar sus datos">
+          <IconUnlock /> Reabrir mes
+        </button>
+      ) : activeMonth === openMonth ? (
         <button className="btn-close-month" onClick={onClose} title="Cerrar este mes y comenzar el siguiente">
           <IconLock /> Cerrar mes
+        </button>
+      ) : (
+        <button className="btn-close-month" onClick={onReclose} title="Volver a cerrar este mes">
+          <IconLock /> Volver a cerrar
         </button>
       )}
     </div>
