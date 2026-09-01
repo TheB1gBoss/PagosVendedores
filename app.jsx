@@ -413,6 +413,29 @@ function App() {
   function openDetail(id) { setEditId(null); setDesc(""); setAmount(""); setSide("empresa"); setView({ screen: "detail", partnerId: id }); }
   function backToOverview() { setEditId(null); setView({ screen: "overview", partnerId: null }); }
 
+  // Importa los datos de otra cuenta (por su UID) a la cuenta actual. Se usa
+  // para recuperar datos que quedaron en otra cuenta (p. ej. cambiaste de
+  // método de acceso). Requiere permiso de lectura sobre ese doc en Firestore.
+  async function importFromUid(oldUid) {
+    const id = String(oldUid || "").trim();
+    if (!id) throw new Error("Pega el UID de la cuenta con tus datos.");
+    if (user && id === user.uid) throw new Error("Ese es el UID de tu cuenta actual. Pega el de la OTRA cuenta.");
+    const snap = await fb.db.collection("ledgers").doc(id).get();
+    if (!snap.exists) throw new Error("No se encontraron datos en ese UID.");
+    const data = snap.data();
+    const empty = (!Array.isArray(data.partners) || !data.partners.length) && (!data.periods || !Object.keys(data.periods).length);
+    if (empty) throw new Error("Esa cuenta no tiene datos para importar.");
+    lastLocalEditRef.current = Date.now(); // marcar como edición local (se guardará en tu cuenta)
+    if (data.company) setCompany(data.company);
+    if (Array.isArray(data.partners)) setPartners(data.partners);
+    if (data.openMonth) setOpenMonth(data.openMonth);
+    if (data.periods) setPeriods(data.periods);
+    setHistory(Array.isArray(data.history) ? data.history : []);
+    setSelectedMonth(data.openMonth || curMonthKey());
+    setView({ screen: "overview", partnerId: null });
+    logEvent("partner", "Importó datos desde otra cuenta");
+  }
+
   const themeToggle = (
     <button className="util-btn icon-only" onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
             title={theme === "dark" ? "Modo claro" : "Modo oscuro"}>
@@ -473,7 +496,7 @@ function App() {
         </TweaksPanel>
 
         {showHistory && <HistoryModal history={history} onClose={() => setShowHistory(false)} />}
-        {showAccount && fb && user && <AccountModal user={user} onClose={() => setShowAccount(false)} />}
+        {showAccount && fb && user && <AccountModal user={user} onImport={importFromUid} onClose={() => setShowAccount(false)} />}
       </div>
     </div>
   );
@@ -982,7 +1005,7 @@ function UserChip({ user, onClick }) {
 }
 
 /* ---------------------------- Account modal ----------------------- */
-function AccountModal({ user, onClose }) {
+function AccountModal({ user, onImport, onClose }) {
   const linked = hasPasswordProvider(user);
   const [username, setUsername] = useState(user.displayName || "");
   const [password, setPassword] = useState("");
@@ -990,11 +1013,30 @@ function AccountModal({ user, onClose }) {
   const [err, setErr] = useState("");
   const [done, setDone] = useState(false);
 
+  const [impUid, setImpUid] = useState("");
+  const [impBusy, setImpBusy] = useState(false);
+  const [impErr, setImpErr] = useState("");
+  const [impDone, setImpDone] = useState(false);
+
   useEffect(() => {
     const onKey = (e) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+
+  async function doImport() {
+    setImpErr(""); setImpDone(false);
+    if (!impUid.trim()) { setImpErr("Pega el UID de la otra cuenta."); return; }
+    if (!window.confirm("Esto REEMPLAZARÁ los datos de tu cuenta actual con los de la otra cuenta. ¿Continuar?")) return;
+    setImpBusy(true);
+    try { await onImport(impUid); setImpDone(true); }
+    catch (e) {
+      const msg = e && e.code === "permission-denied"
+        ? "Sin permiso para leer esa cuenta. Cambia temporalmente las reglas de Firestore (ver instrucciones) y reintenta."
+        : (e && e.message ? e.message : "No se pudo importar.");
+      setImpErr(msg);
+    } finally { setImpBusy(false); }
+  }
 
   async function submit(e) {
     if (e) e.preventDefault();
@@ -1034,6 +1076,23 @@ function AccountModal({ user, onClose }) {
                 <button className="btn-google" type="submit" disabled={busy}>{busy ? "Guardando…" : "Guardar acceso"}</button>
               </form>
               <div className="gate-err">{err}</div>
+            </React.Fragment>
+          )}
+
+          <div className="acc-sep" />
+
+          <div className="acc-h">Importar datos desde otra cuenta</div>
+          {impDone ? (
+            <div className="acc-note ok">✓ ¡Datos importados! Ya deberías ver tu empresa, socios y meses en esta cuenta.</div>
+          ) : (
+            <React.Fragment>
+              <div className="acc-note">¿Tus datos quedaron en otra cuenta? Pega su <strong>UID</strong> (Firebase → Authentication → Users) para traerlos aquí. Reemplaza los datos de esta cuenta.</div>
+              <form className="acc-form" onSubmit={(e) => { e.preventDefault(); doImport(); }}>
+                <input className="input" type="text" placeholder="UID de la otra cuenta" value={impUid}
+                       autoCorrect="off" spellCheck="false" onChange={(e) => setImpUid(e.target.value)} />
+                <button className="util-btn add-partner-btn" type="submit" disabled={impBusy}>{impBusy ? "Importando…" : "Importar datos"}</button>
+              </form>
+              <div className="gate-err">{impErr}</div>
             </React.Fragment>
           )}
         </div>
