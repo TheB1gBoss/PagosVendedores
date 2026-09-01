@@ -30,6 +30,7 @@ const IconMoon = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="no
 const IconSun = () => (<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2v2.5M12 19.5V22M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2 12h2.5M19.5 12H22M4.2 19.8 6 18M18 6l1.8-1.8"/></svg>);
 const IconLogout = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>);
 const IconHistory = () => (<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/><path d="M12 7v5l3 2"/></svg>);
+const GoogleG = () => (<svg className="g-ico" viewBox="0 0 48 48"><path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/><path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/><path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/><path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/></svg>);
 
 /* --------------------------- Formatting --------------------------- */
 const fmtPlain = new Intl.NumberFormat("es-CL", { maximumFractionDigits: 0 });
@@ -74,11 +75,14 @@ const fb = (() => {
 function useAuth() {
   const [user, setUser] = useState(null);
   const [ready, setReady] = useState(!fb);
+  const [authError, setAuthError] = useState("");
   useEffect(() => {
     if (!fb) return;
+    // Completa el flujo de redirección de Google (usado en móvil) y captura errores.
+    fb.auth.getRedirectResult().catch((e) => { console.error("[Auth] redirección:", e); setAuthError(translateAuthError(e)); });
     return fb.auth.onAuthStateChanged((u) => { setUser(u); setReady(true); });
   }, []);
-  return { user, ready };
+  return { user, ready, authError };
 }
 
 // Acceso por usuario + contraseña → email sintético interno (hex, siempre válido).
@@ -98,6 +102,23 @@ async function registerWithUsername(username, password) {
     try { await cred.user.updateProfile({ displayName: normalizeUsername(username) }); } catch (e) {}
   }
 }
+
+// Acceso con Google (opción sin contraseña). En móvil se usa redirección
+// porque los popups suelen fallar/bloquearse.
+const isMobileDevice = () =>
+  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent || "") ||
+  (window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches);
+async function signInWithGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  provider.setCustomParameters({ prompt: "select_account" });
+  if (isMobileDevice()) { await fb.auth.signInWithRedirect(provider); return; }
+  try { await fb.auth.signInWithPopup(provider); }
+  catch (e) {
+    const redirectable = ["auth/popup-blocked", "auth/cancelled-popup-request", "auth/operation-not-supported-in-this-environment", "auth/web-storage-unsupported"];
+    if (redirectable.includes(e.code)) { await fb.auth.signInWithRedirect(provider); return; }
+    throw e;
+  }
+}
 function translateAuthError(e) {
   switch (e && e.code) {
     case "auth/invalid-credential": case "auth/wrong-password": case "auth/user-not-found":
@@ -107,7 +128,12 @@ function translateAuthError(e) {
     case "auth/invalid-email": return "Usuario inválido. Usa solo letras y números.";
     case "auth/too-many-requests": return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
     case "auth/operation-not-allowed":
-      return "El acceso con usuario y contraseña no está habilitado en Firebase (Authentication → Sign-in method → Email/Password).";
+      return "Ese método de acceso no está habilitado en Firebase (Authentication → Sign-in method).";
+    case "auth/unauthorized-domain":
+      return "Este dominio no está autorizado en Firebase (Authentication → Settings → Dominios autorizados).";
+    case "auth/account-exists-with-different-credential":
+      return "Ya existe una cuenta con ese correo usando otro método de acceso.";
+    case "auth/popup-closed-by-user": case "auth/cancelled-popup-request": return "";
     case "auth/network-request-failed": return "Sin conexión. Revisa tu internet e inténtalo de nuevo.";
     default: return e && e.message ? e.message : "No se pudo iniciar sesión.";
   }
@@ -171,7 +197,7 @@ const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
 /* ------------------------------ App ------------------------------- */
 function App() {
   const [t, setTweak] = useTweaks(TWEAK_DEFAULTS);
-  const { user, ready } = useAuth();
+  const { user, ready, authError } = useAuth();
 
   const [theme, setTheme] = useState(() => localStorage.getItem("bc-theme") || "light");
   useEffect(() => {
@@ -385,7 +411,7 @@ function App() {
   );
 
   if (fb && !ready) return <FullScreenLoader />;
-  if (fb && !user) return <LoginScreen themeToggle={themeToggle} showDiamond={t.showDiamond} />;
+  if (fb && !user) return <LoginScreen themeToggle={themeToggle} showDiamond={t.showDiamond} authError={authError} />;
 
   return (
     <div className="app-screen">
@@ -858,7 +884,7 @@ function FullScreenLoader() {
   return (<div className="gate"><div className="spinner" /></div>);
 }
 
-function LoginScreen({ themeToggle, showDiamond }) {
+function LoginScreen({ themeToggle, showDiamond, authError }) {
   const [mode, setMode] = useState("login");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -883,6 +909,18 @@ function LoginScreen({ themeToggle, showDiamond }) {
     }
   }
 
+  async function handleGoogle() {
+    setErr(""); setBusy(true);
+    try {
+      await signInWithGoogle(); // en móvil redirige; con popup, onAuthStateChanged hace el resto
+    } catch (e2) {
+      console.error("[Auth] Error con Google:", e2);
+      const m = translateAuthError(e2);
+      if (m) setErr(m);
+      setBusy(false);
+    }
+  }
+
   return (
     <div className="gate gate-auth">
       <div className="gate-theme">{themeToggle}</div>
@@ -892,8 +930,12 @@ function LoginScreen({ themeToggle, showDiamond }) {
         <div className="gate-sub">Libro de saldos &amp; cuentas</div>
         <div className="gate-rule" />
         <div className="gate-text">
-          {isRegister ? "Crea tu cuenta con un usuario y una contraseña." : "Ingresa con tu usuario y contraseña."}
+          {isRegister ? "Crea tu cuenta para acceder a tu libro de saldos." : "Ingresa con tu cuenta de Google o con tu usuario y contraseña."}
         </div>
+        <button type="button" className="gbtn" onClick={handleGoogle} disabled={busy}>
+          <GoogleG /> Continuar con Google
+        </button>
+        <div className="gate-or">o</div>
         <form className="gate-form" onSubmit={submit}>
           <input className="input" type="text" placeholder="Usuario" value={username}
                  autoComplete="username" autoCorrect="off" spellCheck="false"
@@ -905,7 +947,7 @@ function LoginScreen({ themeToggle, showDiamond }) {
             {busy ? "Un momento…" : (isRegister ? "Crear cuenta" : "Iniciar sesión")}
           </button>
         </form>
-        <div className="gate-err">{err}</div>
+        <div className="gate-err">{err || authError}</div>
         <button type="button" className="gate-switch" onClick={() => { setErr(""); setMode(isRegister ? "login" : "register"); }}>
           {isRegister ? "¿Ya tienes cuenta? Inicia sesión" : "¿No tienes cuenta? Crear una"}
         </button>

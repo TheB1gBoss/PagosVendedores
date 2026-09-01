@@ -244,6 +244,12 @@
   .btn-google:active { transform: translateY(1px); }
   .btn-google:disabled { opacity: .6; cursor: default; }
   .btn-google .g-ico { width: 18px; height: 18px; background: #fff; border-radius: 3px; padding: 1px; flex: none; }
+  .gbtn { appearance: none; cursor: pointer; font-family: inherit; width: 100%; height: 48px; padding: 0 18px; border-radius: 11px; background: #ffffff; color: #1f1f1f; border: 1px solid rgba(0,0,0,0.16); font-size: 14.5px; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 11px; transition: background .16s, box-shadow .16s; }
+  .gbtn:hover { background: #f6f6f6; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+  .gbtn:disabled { opacity: .6; cursor: default; }
+  .gbtn .g-ico { width: 18px; height: 18px; flex: none; }
+  .gate-or { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; margin: 16px 0 6px; }
+  .gate-or::before, .gate-or::after { content: ""; flex: 1; height: 1px; background: var(--hairline); }
   .gate-form { display: flex; flex-direction: column; gap: 11px; text-align: left; }
   .gate-form .input { height: 46px; }
   .gate-form .btn-google { margin-top: 5px; }
