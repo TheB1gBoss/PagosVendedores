@@ -112,19 +112,27 @@ async function registerWithUsername(username, password) {
 async function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
-  try {
-    await fb.auth.signInWithPopup(provider);
-  } catch (e) {
-    const redirectable = ["auth/popup-blocked", "auth/operation-not-supported-in-this-environment"];
-    if (redirectable.includes(e.code)) { await fb.auth.signInWithRedirect(provider); return; }
-    throw e;
-  }
+  // Solo popup: la redirección se rompe en GitHub Pages (dominios cruzados).
+  await fb.auth.signInWithPopup(provider);
 }
+
+// Liga un acceso usuario+contraseña a la cuenta actual (misma cuenta y datos).
+// Sirve para entrar en navegadores donde el popup de Google falla (p. ej.
+// Chrome en móvil): usuario/contraseña no usa popups ni dominios cruzados.
+async function linkUsernamePassword(user, username, password) {
+  const cred = firebase.auth.EmailAuthProvider.credential(usernameToEmail(username), padPassword(password));
+  await user.linkWithCredential(cred);
+  if (user.updateProfile) { try { await user.updateProfile({ displayName: normalizeUsername(username) }); } catch (e) {} }
+}
+const hasPasswordProvider = (user) => !!(user && user.providerData && user.providerData.some((p) => p.providerId === "password"));
 function translateAuthError(e) {
   switch (e && e.code) {
     case "auth/invalid-credential": case "auth/wrong-password": case "auth/user-not-found":
       return "Usuario o contraseña incorrectos.";
-    case "auth/email-already-in-use": return "Ese usuario ya existe. Inicia sesión.";
+    case "auth/email-already-in-use": return "Ese usuario ya está en uso. Elige otro (o inicia sesión con él).";
+    case "auth/credential-already-in-use": return "Ese usuario ya está ligado a otra cuenta. Elige otro.";
+    case "auth/provider-already-linked": return "Esta cuenta ya tiene acceso con usuario y contraseña.";
+    case "auth/requires-recent-login": return "Por seguridad, vuelve a iniciar sesión con Google y reinténtalo.";
     case "auth/weak-password": return "La contraseña debe tener al menos 6 caracteres.";
     case "auth/invalid-email": return "Usuario inválido. Usa solo letras y números.";
     case "auth/too-many-requests": return "Demasiados intentos. Espera un momento e inténtalo de nuevo.";
@@ -220,6 +228,7 @@ function App() {
   const [selectedMonth, setSelectedMonth] = useState(INIT.openMonth);
   const [view, setView] = useState({ screen: "overview", partnerId: null });
   const [showHistory, setShowHistory] = useState(false);
+  const [showAccount, setShowAccount] = useState(false);
 
   // formulario de movimiento (en detalle)
   const [desc, setDesc] = useState("");
@@ -418,7 +427,7 @@ function App() {
     <div className="app-screen">
       <div className="wrap">
         <div className="util-bar">
-          {fb && user && <UserChip user={user} />}
+          {fb && user && <UserChip user={user} onClick={() => setShowAccount(true)} />}
           <button className="util-btn" onClick={() => setShowHistory(true)} title="Ver historial de actividad">
             <IconHistory /> <span className="util-label">Historial</span>
           </button>
@@ -464,6 +473,7 @@ function App() {
         </TweaksPanel>
 
         {showHistory && <HistoryModal history={history} onClose={() => setShowHistory(false)} />}
+        {showAccount && fb && user && <AccountModal user={user} onClose={() => setShowAccount(false)} />}
       </div>
     </div>
   );
@@ -957,16 +967,77 @@ function LoginScreen({ themeToggle, showDiamond, authError }) {
   );
 }
 
-function UserChip({ user }) {
+function UserChip({ user, onClick }) {
   const [imgOk, setImgOk] = useState(true);
   const label = user.displayName || (user.email ? user.email.replace(/@pagosvendedores\.app$/, "") : "Cuenta");
   const initial = (label.trim()[0] || "?").toUpperCase();
   return (
-    <div className="user-chip" title={label}>
+    <button type="button" className="user-chip" title="Ver / configurar cuenta" onClick={onClick}>
       {user.photoURL && imgOk
         ? <img className="uc-avatar" src={user.photoURL} alt="" referrerPolicy="no-referrer" onError={() => setImgOk(false)} />
         : <span className="uc-avatar fallback">{initial}</span>}
       <span className="uc-name">{label}</span>
+    </button>
+  );
+}
+
+/* ---------------------------- Account modal ----------------------- */
+function AccountModal({ user, onClose }) {
+  const linked = hasPasswordProvider(user);
+  const [username, setUsername] = useState(user.displayName || "");
+  const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState("");
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  async function submit(e) {
+    if (e) e.preventDefault();
+    setErr("");
+    const u = username.trim();
+    if (u.replace(/\s+/g, "").length < 2) { setErr("Escribe un usuario."); return; }
+    if (password.length < 1) { setErr("Escribe una contraseña."); return; }
+    setBusy(true);
+    try { await linkUsernamePassword(user, u, password); setDone(true); }
+    catch (e2) { console.error("[Auth] Error al ligar acceso:", e2); setErr(translateAuthError(e2)); }
+    finally { setBusy(false); }
+  }
+
+  const name = user.displayName || (user.email ? user.email.replace(/@pagosvendedores\.app$/, "") : "Cuenta");
+
+  return (
+    <div className="hist-overlay" onClick={onClose}>
+      <div className="hist-modal" onClick={(e) => e.stopPropagation()} role="dialog" aria-label="Tu cuenta">
+        <div className="hist-head">
+          <div>
+            <div className="hist-title">Tu cuenta</div>
+            <div className="hist-sub">{name}</div>
+          </div>
+          <button className="icon-btn" title="Cerrar" onClick={onClose}><IconX /></button>
+        </div>
+        <div className="hist-body acc-body">
+          {(linked || done) ? (
+            <div className="acc-note ok">✓ Ya tienes acceso con <strong>usuario y contraseña</strong> en esta cuenta. Puedes iniciar sesión con él en cualquier navegador (Chrome, Safari…), con los mismos datos.</div>
+          ) : (
+            <React.Fragment>
+              <div className="acc-note">Agrega un <strong>usuario y contraseña</strong> a tu cuenta para poder entrar sin Google (útil si Google falla en Chrome del celular). Es la <strong>misma cuenta</strong> y los mismos datos.</div>
+              <form className="acc-form" onSubmit={submit}>
+                <input className="input" type="text" placeholder="Usuario" value={username}
+                       autoComplete="username" autoCorrect="off" spellCheck="false" onChange={(e) => setUsername(e.target.value)} />
+                <input className="input" type="password" placeholder="Contraseña" value={password}
+                       autoComplete="new-password" onChange={(e) => setPassword(e.target.value)} />
+                <button className="btn-google" type="submit" disabled={busy}>{busy ? "Guardando…" : "Guardar acceso"}</button>
+              </form>
+              <div className="gate-err">{err}</div>
+            </React.Fragment>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

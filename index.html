@@ -217,7 +217,12 @@
   .result-amount .cur { font-size: 24px; opacity: .55; font-weight: 500; margin-right: 4px; }
 
   /* ===================== AUTH / USER ===================== */
-  .user-chip { display: flex; align-items: center; gap: 9px; height: 38px; padding: 0 6px 0 10px; border-radius: 9px; background: var(--surface-1); border: 1px solid var(--hairline); margin-right: auto; }
+  .user-chip { appearance: none; font-family: inherit; cursor: pointer; display: flex; align-items: center; gap: 9px; height: 38px; padding: 0 6px 0 10px; border-radius: 9px; background: var(--surface-1); border: 1px solid var(--hairline); margin-right: auto; transition: border-color .16s; }
+  .user-chip:hover { border-color: var(--hairline-strong); }
+  .acc-body { gap: 14px; padding: 14px 16px 18px; }
+  .acc-note { font-size: 13px; color: var(--text-2); line-height: 1.55; }
+  .acc-note.ok { color: #2f9e63; font-weight: 500; }
+  .acc-form { display: flex; flex-direction: column; gap: 10px; }
   .user-chip .uc-name { font-size: 12.5px; font-weight: 600; color: var(--text-2); max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .user-chip .uc-avatar { width: 24px; height: 24px; border-radius: 50%; object-fit: cover; flex: none; background: var(--surface-3); }
   .user-chip .uc-avatar.fallback { display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--ink-contrast); background: var(--ink); }
