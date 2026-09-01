@@ -103,18 +103,19 @@ async function registerWithUsername(username, password) {
   }
 }
 
-// Acceso con Google (opción sin contraseña). En móvil se usa redirección
-// porque los popups suelen fallar/bloquearse.
-const isMobileDevice = () =>
-  /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|Mobile/i.test(navigator.userAgent || "") ||
-  (window.matchMedia && window.matchMedia("(hover: none) and (pointer: coarse)").matches);
+// Acceso con Google (opción sin contraseña). Usamos POPUP en todos los
+// dispositivos: en GitHub Pages la redirección se rompe en móviles porque el
+// navegador bloquea el almacenamiento entre el dominio de la app y el de
+// Firebase, y la sesión no persiste (vuelve al login). El popup, al abrirlo el
+// propio toque del usuario, sí funciona en móvil. Solo si el navegador bloquea
+// el popup, caemos a redirección como último recurso.
 async function signInWithGoogle() {
   const provider = new firebase.auth.GoogleAuthProvider();
   provider.setCustomParameters({ prompt: "select_account" });
-  if (isMobileDevice()) { await fb.auth.signInWithRedirect(provider); return; }
-  try { await fb.auth.signInWithPopup(provider); }
-  catch (e) {
-    const redirectable = ["auth/popup-blocked", "auth/cancelled-popup-request", "auth/operation-not-supported-in-this-environment", "auth/web-storage-unsupported"];
+  try {
+    await fb.auth.signInWithPopup(provider);
+  } catch (e) {
+    const redirectable = ["auth/popup-blocked", "auth/operation-not-supported-in-this-environment"];
     if (redirectable.includes(e.code)) { await fb.auth.signInWithRedirect(provider); return; }
     throw e;
   }
